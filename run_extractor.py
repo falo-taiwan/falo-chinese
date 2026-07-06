@@ -26,7 +26,8 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
         'format': 'best',
         'outtmpl': video_file,
         'quiet': True,
-        'no_warnings': True
+        'no_warnings': True,
+        'remote_components': True
     }
     if cookies:
         ydl_opts['cookiefile'] = cookies
