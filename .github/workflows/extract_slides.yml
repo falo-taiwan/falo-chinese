@@ -34,7 +34,7 @@ jobs:
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
         if: "${{ env.YT_COOKIES != '' }}"
         run: |
-          echo "$YT_COOKIES" > cookies.txt
+          python -c "import os; open('cookies.txt', 'w', encoding='utf-8').write(os.environ['YT_COOKIES'])"
 
       - name: Run Slide Extractor
         run: |
