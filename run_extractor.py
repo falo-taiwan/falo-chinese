@@ -331,7 +331,7 @@ def generate_report_html(file_path, title, video_url, duration, slide_candidates
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0, cookies=None, token_hint=None):
+def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0, cookies=None, token_hint=None, json_only=False):
     import time
     start_time = time.time()
 
@@ -463,16 +463,21 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
                 timestamp = format_timestamp(current_time)
                 print(f"📸 Detected new slide #{slide_no} at {timestamp} (MAE: {mae:.2f})")
                 
-                # 儲存高解析度 PNG 投影片
-                slide_filename = os.path.join(temp_dir, f"slide_{slide_no:03d}.png")
-                cv2.imwrite(slide_filename, frame)
+                slide_filename = None
+                file_bytes = b""
+                if not json_only:
+                    # 儲存高解析度 PNG 投影片
+                    slide_filename = os.path.join(temp_dir, f"slide_{slide_no:03d}.png")
+                    cv2.imwrite(slide_filename, frame)
+                    try:
+                        with open(slide_filename, "rb") as f:
+                            file_bytes = f.read()
+                    except Exception as e:
+                        print(f"   ⚠️ Read slide file failed: {e}")
                 
-                # 直傳此投影片至 Workers R2
+                # 直傳此投影片中繼資料至 Workers
                 upload_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/upload"
                 try:
-                    with open(slide_filename, "rb") as f:
-                        file_bytes = f.read()
-                        
                     up_res = requests.post(upload_url, data=file_bytes, headers={
                         "X-Slide-No": str(slide_no),
                         "X-Timestamp": timestamp,
@@ -498,14 +503,20 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             timestamp = format_timestamp(current_time)
             print(f"📸 Detected first slide #{slide_no} at {timestamp}")
             
-            slide_filename = os.path.join(temp_dir, f"slide_{slide_no:03d}.png")
-            cv2.imwrite(slide_filename, frame)
+            slide_filename = None
+            file_bytes = b""
+            if not json_only:
+                slide_filename = os.path.join(temp_dir, f"slide_{slide_no:03d}.png")
+                cv2.imwrite(slide_filename, frame)
+                try:
+                    with open(slide_filename, "rb") as f:
+                        file_bytes = f.read()
+                except Exception as e:
+                    print(f"   ⚠️ Read first slide failed: {e}")
             
             # 直傳至 Workers
             upload_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/upload"
             try:
-                with open(slide_filename, "rb") as f:
-                    file_bytes = f.read()
                 up_res = requests.post(upload_url, data=file_bytes, headers={
                     "X-Slide-No": str(slide_no),
                     "X-Timestamp": timestamp,
@@ -535,78 +546,120 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
         sys.exit(0)
 
     # 4. 編譯 PDF 文件並上傳
-    print("📄 Compiling PDF presentation...")
     pdf_path = "presentation.pdf"
-    try:
-        images_list = []
-        for s in slide_candidates:
-            img = Image.open(s["path"]).convert("RGB")
-            images_list.append(img)
-            
-        if images_list:
-            images_list[0].save(pdf_path, save_all=True, append_images=images_list[1:])
-            print("   PDF compiled successfully.")
-            
-            # 上傳 PDF
-            doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
-            with open(pdf_path, "rb") as f:
-                pdf_res = requests.post(doc_url, data=f.read(), headers={
-                    "X-Doc-Type": "pdf"
-                })
-            if pdf_res.status_code == 200:
-                print("   PDF uploaded to Cloudflare R2.")
-            else:
-                print(f"   ❌ PDF upload failed with status {pdf_res.status_code}: {pdf_res.text}")
-    except Exception as e:
-        print(f"❌ Failed to compile/upload PDF: {e}")
+    if not json_only:
+        print("📄 Compiling PDF presentation...")
+        try:
+            images_list = []
+            for s in slide_candidates:
+                if s["path"]:
+                    img = Image.open(s["path"]).convert("RGB")
+                    images_list.append(img)
+                
+            if images_list:
+                images_list[0].save(pdf_path, save_all=True, append_images=images_list[1:])
+                print("   PDF compiled successfully.")
+                
+                # 上傳 PDF
+                doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
+                with open(pdf_path, "rb") as f:
+                    pdf_res = requests.post(doc_url, data=f.read(), headers={
+                        "X-Doc-Type": "pdf"
+                    })
+                if pdf_res.status_code == 200:
+                    print("   PDF uploaded to Cloudflare R2.")
+                else:
+                    print(f"   ❌ PDF upload failed with status {pdf_res.status_code}: {pdf_res.text}")
+        except Exception as e:
+            print(f"❌ Failed to compile/upload PDF: {e}")
 
     # 5. 編譯 PPTX 文件並上傳
-    print("📊 Compiling PPTX presentation...")
     pptx_path = "presentation.pptx"
-    try:
-        prs = Presentation()
-        # 設定 16:9 比例頁面尺寸
-        prs.slide_width = Inches(13.333)
-        prs.slide_height = Inches(7.5)
-        blank_slide_layout = prs.slide_layouts[6]
-        
-        for s in slide_candidates:
-            slide = prs.slides.add_slide(blank_slide_layout)
-            slide.shapes.add_picture(s["path"], 0, 0, width=prs.slide_width, height=prs.slide_height)
+    if not json_only:
+        print("📊 Compiling PPTX presentation...")
+        try:
+            prs = Presentation()
+            # 設定 16:9 比例頁面尺寸
+            prs.slide_width = Inches(13.333)
+            prs.slide_height = Inches(7.5)
+            blank_slide_layout = prs.slide_layouts[6]
             
-        prs.save(pptx_path)
-        print("   PPTX compiled successfully.")
-        
-        # 上傳 PPTX
-        with open(pptx_path, "rb") as f:
-            pptx_res = requests.post(doc_url, data=f.read(), headers={
-                "X-Doc-Type": "pptx"
-            })
-        if pptx_res.status_code == 200:
-            print("   PPTX uploaded to Cloudflare R2.")
-        else:
-            print(f"   ❌ PPTX upload failed with status {pptx_res.status_code}: {pptx_res.text}")
-    except Exception as e:
-        print(f"❌ Failed to compile/upload PPTX: {e}")
+            for s in slide_candidates:
+                if s["path"]:
+                    slide = prs.slides.add_slide(blank_slide_layout)
+                    slide.shapes.add_picture(s["path"], 0, 0, width=prs.slide_width, height=prs.slide_height)
+                
+            prs.save(pptx_path)
+            print("   PPTX compiled successfully.")
+            
+            # 上傳 PPTX
+            doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
+            with open(pptx_path, "rb") as f:
+                pptx_res = requests.post(doc_url, data=f.read(), headers={
+                    "X-Doc-Type": "pptx"
+                })
+            if pptx_res.status_code == 200:
+                print("   PPTX uploaded to Cloudflare R2.")
+            else:
+                print(f"   ❌ PPTX upload failed with status {pptx_res.status_code}: {pptx_res.text}")
+        except Exception as e:
+            print(f"❌ Failed to compile/upload PPTX: {e}")
 
     # 5.2. 編譯 HTML 報告並上傳
-    print("📄 Compiling HTML report...")
     html_path = "report.html"
+    if not json_only:
+        print("📄 Compiling HTML report...")
+        try:
+            generate_report_html(html_path, title, video_url, duration, slide_candidates)
+            print("   HTML report compiled successfully.")
+            
+            # 上傳 HTML
+            doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
+            with open(html_path, "rb") as f:
+                html_res = requests.post(doc_url, data=f.read(), headers={
+                    "X-Doc-Type": "html"
+                })
+            if html_res.status_code == 200:
+                print("   HTML report uploaded to Cloudflare R2.")
+            else:
+                print(f"   ❌ HTML report upload failed with status {html_res.status_code}: {html_res.text}")
+        except Exception as e:
+            print(f"❌ Failed to compile/upload HTML report: {e}")
+
+    # 5.3. 編譯 JSON 時間軸檔案並上傳
+    print("💾 Compiling JSON timeline...")
+    json_path = "slides.json"
     try:
-        generate_report_html(html_path, title, video_url, duration, slide_candidates)
-        print("   HTML report compiled successfully.")
-        
-        # 上傳 HTML
-        with open(html_path, "rb") as f:
-            html_res = requests.post(doc_url, data=f.read(), headers={
-                "X-Doc-Type": "html"
+        import json
+        slides_list = []
+        for s in slide_candidates:
+            slides_list.append({
+                "slide_no": s["slide_no"],
+                "timestamp": s["timestamp"],
+                "seconds": s["seconds"],
+                "filename": f"slide_{s['slide_no']:03d}.png"
             })
-        if html_res.status_code == 200:
-            print("   HTML report uploaded to Cloudflare R2.")
+        payload = {
+            "title": title,
+            "video_path": video_url,
+            "slides": slides_list
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        print("   JSON timeline compiled successfully.")
+        
+        # 上傳 JSON 到 Workers
+        doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
+        with open(json_path, "rb") as f:
+            json_res = requests.post(doc_url, data=f.read(), headers={
+                "X-Doc-Type": "json"
+            })
+        if json_res.status_code == 200:
+            print("   JSON timeline uploaded to Cloudflare R2.")
         else:
-            print(f"   ❌ HTML report upload failed with status {html_res.status_code}: {html_res.text}")
+            print(f"   ❌ JSON upload failed with status {json_res.status_code}: {json_res.text}")
     except Exception as e:
-        print(f"❌ Failed to compile/upload HTML report: {e}")
+        print(f"❌ Failed to compile/upload JSON: {e}")
 
     # 5.5. 將任務狀態更新為 completed，並發送執行時間
     try:
@@ -635,6 +688,8 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             os.remove(pptx_path)
         if os.path.exists(html_path):
             os.remove(html_path)
+        if os.path.exists(json_path):
+            os.remove(json_path)
         print("🧹 Cleaned up all temporary files.")
     except Exception as e:
         print(f"⚠️ Error during cleanup: {e}")
@@ -650,6 +705,7 @@ if __name__ == "__main__":
     parser.add_argument("--interval", type=float, default=1.0, help="Frame check interval in seconds")
     parser.add_argument("--cookies", help="Path to cookies file")
     parser.add_argument("--token-hint", help="First few characters of token for metrics tracking")
+    parser.add_argument("--json-only", action="store_true", help="Only generate JSON timeline (skip image uploads and PDF/PPTX/HTML creation)")
     
     args = parser.parse_args()
     analyze_and_upload(
@@ -659,5 +715,6 @@ if __name__ == "__main__":
         threshold=args.threshold,
         interval=args.interval,
         cookies=args.cookies,
-        token_hint=args.token_hint
+        token_hint=args.token_hint,
+        json_only=args.json_only
     )
