@@ -20,19 +20,27 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
     print(f"   Task ID: {task_id}")
     print(f"   Cloudflare URL: {cloudflare_url}")
 
-    # Debug: Check Node.js
+    # Debug: Check JS Runtimes (Node.js & Deno)
     try:
         import shutil
+        import subprocess
         node_path = shutil.which("node")
         print(f"🔍 Node.js path: {node_path}")
         if node_path:
-            import subprocess
             node_ver = subprocess.check_output(["node", "--version"], text=True).strip()
             print(f"   Node.js version: {node_ver}")
         else:
             print("   Node.js not found in PATH!")
-    except Exception as node_err:
-        print(f"   Error checking Node.js: {node_err}")
+            
+        deno_path = shutil.which("deno")
+        print(f"🔍 Deno path: {deno_path}")
+        if deno_path:
+            deno_ver = subprocess.check_output(["deno", "--version"], text=True).splitlines()[0]
+            print(f"   Deno version: {deno_ver}")
+        else:
+            print("   Deno not found in PATH!")
+    except Exception as js_err:
+        print(f"   Error checking JS runtimes: {js_err}")
 
     # 1. 下載 YouTube 影片 (優先下載 720p MP4)
     video_file = "temp_video.mp4"
@@ -41,7 +49,7 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
         'outtmpl': video_file,
         'quiet': True,
         'no_warnings': True,
-        'remote_components': ['ejs']
+        'remote_components': ['ejs:github']
     }
     if cookies:
         ydl_opts['cookiefile'] = cookies
