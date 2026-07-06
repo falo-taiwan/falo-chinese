@@ -29,9 +29,19 @@ jobs:
           sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install yt-dlp opencv-python-headless requests python-pptx pillow
 
+      - name: Create cookies.txt
+        if: "${{ secrets.YT_COOKIES != '' }}"
+        run: |
+          echo "${{ secrets.YT_COOKIES }}" > cookies.txt
+
       - name: Run Slide Extractor
         run: |
+          COOKIE_ARG=""
+          if [ -f cookies.txt ]; then
+            COOKIE_ARG="--cookies cookies.txt"
+          fi
           python run_extractor.py \
             --url "${{ github.event.inputs.video_url }}" \
             --task-id "${{ github.event.inputs.task_id }}" \
-            --cloudflare-url "${{ github.event.inputs.cloudflare_url }}"
+            --cloudflare-url "${{ github.event.inputs.cloudflare_url }}" \
+            $COOKIE_ARG

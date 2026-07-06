@@ -15,7 +15,7 @@ def format_timestamp(seconds: float) -> str:
     s = int(seconds % 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0):
+def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0, cookies=None):
     print(f"🎬 Starting YouTube extraction for URL: {video_url}")
     print(f"   Task ID: {task_id}")
     print(f"   Cloudflare URL: {cloudflare_url}")
@@ -28,6 +28,8 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
         'quiet': True,
         'no_warnings': True
     }
+    if cookies:
+        ydl_opts['cookiefile'] = cookies
     
     title = "YouTube Video"
     duration = 0
@@ -238,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--cloudflare-url", required=True, help="Cloudflare Worker Domain URL")
     parser.add_argument("--threshold", type=float, default=8.0, help="MAE change threshold")
     parser.add_argument("--interval", type=float, default=1.0, help="Frame check interval in seconds")
+    parser.add_argument("--cookies", help="Path to cookies file")
     
     args = parser.parse_args()
     analyze_and_upload(
@@ -245,5 +248,6 @@ if __name__ == "__main__":
         task_id=args.task_id,
         cloudflare_url=args.cloudflare_url,
         threshold=args.threshold,
-        interval=args.interval
+        interval=args.interval,
+        cookies=args.cookies
     )
