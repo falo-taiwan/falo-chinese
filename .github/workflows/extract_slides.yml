@@ -30,9 +30,11 @@ jobs:
           pip install yt-dlp opencv-python-headless requests python-pptx pillow
 
       - name: Create cookies.txt
-        if: "${{ secrets.YT_COOKIES != '' }}"
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        if: "${{ env.YT_COOKIES != '' }}"
         run: |
-          echo "${{ secrets.YT_COOKIES }}" > cookies.txt
+          echo "$YT_COOKIES" > cookies.txt
 
       - name: Run Slide Extractor
         run: |
