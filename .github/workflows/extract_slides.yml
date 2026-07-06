@@ -11,6 +11,10 @@ on:
       cloudflare_url:
         description: 'Cloudflare Worker URL'
         required: true
+      token_hint:
+        description: 'Token Hint for billing track'
+        required: false
+        default: ''
 
 jobs:
   extract:
@@ -56,4 +60,5 @@ jobs:
             --url "${{ github.event.inputs.video_url }}" \
             --task-id "${{ github.event.inputs.task_id }}" \
             --cloudflare-url "${{ github.event.inputs.cloudflare_url }}" \
+            --token-hint "${{ github.event.inputs.token_hint }}" \
             $COOKIE_ARG

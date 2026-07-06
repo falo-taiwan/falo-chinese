@@ -15,10 +15,21 @@ def format_timestamp(seconds: float) -> str:
     s = int(seconds % 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0, cookies=None):
+def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interval=1.0, cookies=None, token_hint=None):
+    import time
+    start_time = time.time()
+
+    github_run_id = os.environ.get("GITHUB_RUN_ID")
+    github_repo = os.environ.get("GITHUB_REPOSITORY")
+    github_run_url = f"https://github.com/{github_repo}/actions/runs/{github_run_id}" if github_run_id and github_repo else None
+
     print(f"🎬 Starting YouTube extraction for URL: {video_url}")
     print(f"   Task ID: {task_id}")
     print(f"   Cloudflare URL: {cloudflare_url}")
+    if token_hint:
+        print(f"   Token Hint: {token_hint}")
+    if github_run_url:
+        print(f"   GitHub Run URL: {github_run_url}")
 
     # Debug: Check JS Runtimes (Node.js & Deno)
     try:
@@ -85,7 +96,10 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             "title": title,
             "video_name": video_url,
             "video_duration": duration,
-            "status": "analyzing"
+            "status": "analyzing",
+            "github_run_id": github_run_id,
+            "github_run_url": github_run_url,
+            "token_hint": token_hint
         })
         print(f"📌 Task initialized in D1: {r.status_code}")
     except Exception as e:
@@ -259,6 +273,18 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
     except Exception as e:
         print(f"❌ Failed to compile/upload PPTX: {e}")
 
+    # 5.5. 將任務狀態更新為 completed，並發送執行時間
+    try:
+        final_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}"
+        execution_time_sec = float(time.time() - start_time)
+        print(f"⌛ Task completed in {execution_time_sec:.2f}s. Updating status in D1...")
+        requests.put(final_url, json={
+            "status": "completed",
+            "execution_time_sec": execution_time_sec
+        })
+    except Exception as e:
+        print(f"⚠️ Failed to update final task status: {e}")
+
     # 6. 清理暫存檔案
     try:
         if os.path.exists(video_file):
@@ -286,6 +312,7 @@ if __name__ == "__main__":
     parser.add_argument("--threshold", type=float, default=8.0, help="MAE change threshold")
     parser.add_argument("--interval", type=float, default=1.0, help="Frame check interval in seconds")
     parser.add_argument("--cookies", help="Path to cookies file")
+    parser.add_argument("--token-hint", help="First few characters of token for metrics tracking")
     
     args = parser.parse_args()
     analyze_and_upload(
@@ -294,5 +321,6 @@ if __name__ == "__main__":
         cloudflare_url=args.cloudflare_url,
         threshold=args.threshold,
         interval=args.interval,
-        cookies=args.cookies
+        cookies=args.cookies,
+        token_hint=args.token_hint
     )
