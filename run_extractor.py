@@ -23,7 +23,7 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
     # 1. 下載 YouTube 影片 (優先下載 720p MP4)
     video_file = "temp_video.mp4"
     ydl_opts = {
-        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
+        'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
         'outtmpl': video_file,
         'quiet': True,
         'no_warnings': True
