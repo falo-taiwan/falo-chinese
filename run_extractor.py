@@ -20,6 +20,20 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
     print(f"   Task ID: {task_id}")
     print(f"   Cloudflare URL: {cloudflare_url}")
 
+    # Debug: Check Node.js
+    try:
+        import shutil
+        node_path = shutil.which("node")
+        print(f"🔍 Node.js path: {node_path}")
+        if node_path:
+            import subprocess
+            node_ver = subprocess.check_output(["node", "--version"], text=True).strip()
+            print(f"   Node.js version: {node_ver}")
+        else:
+            print("   Node.js not found in PATH!")
+    except Exception as node_err:
+        print(f"   Error checking Node.js: {node_err}")
+
     # 1. 下載 YouTube 影片 (優先下載 720p MP4)
     video_file = "temp_video.mp4"
     ydl_opts = {
