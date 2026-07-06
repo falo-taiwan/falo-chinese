@@ -15,6 +15,10 @@ on:
         description: 'Token Hint for billing track'
         required: false
         default: ''
+      json_only:
+        description: 'Only generate JSON timeline (skip images and PDF/PPTX/HTML)'
+        required: false
+        default: 'false'
 
 jobs:
   extract:
@@ -56,9 +60,14 @@ jobs:
           if [ -f cookies.txt ]; then
             COOKIE_ARG="--cookies cookies.txt"
           fi
+          JSON_ONLY_ARG=""
+          if [ "${{ github.event.inputs.json_only }}" = "true" ]; then
+            JSON_ONLY_ARG="--json-only"
+          fi
           python run_extractor.py \
             --url "${{ github.event.inputs.video_url }}" \
             --task-id "${{ github.event.inputs.task_id }}" \
             --cloudflare-url "${{ github.event.inputs.cloudflare_url }}" \
             --token-hint "${{ github.event.inputs.token_hint }}" \
-            $COOKIE_ARG
+            $COOKIE_ARG \
+            $JSON_ONLY_ARG
