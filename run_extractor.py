@@ -41,6 +41,15 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             duration = info.get('duration', 0)
     except Exception as e:
         print(f"❌ Failed to download YouTube video: {e}")
+        try:
+            print("🔍 Printing available formats for debugging:")
+            debug_opts = {'quiet': True}
+            if cookies:
+                debug_opts['cookiefile'] = cookies
+            with yt_dlp.YoutubeDL(debug_opts) as ydl:
+                ydl.list_formats(ydl.extract_info(video_url, download=False))
+        except Exception as fmt_err:
+            print(f"   Failed to list formats: {fmt_err}")
         sys.exit(1)
 
     print(f"✅ Video downloaded successfully: '{title}' ({duration}s)")
