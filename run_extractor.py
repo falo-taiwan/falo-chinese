@@ -148,7 +148,10 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
                         "X-Timestamp": timestamp,
                         "X-Seconds": str(current_time)
                     })
-                    print(f"   Upload slide #{slide_no} status: {up_res.status_code}")
+                    if up_res.status_code == 200:
+                        print(f"   Upload slide #{slide_no} status: {up_res.status_code}")
+                    else:
+                        print(f"   ❌ Upload slide #{slide_no} status: {up_res.status_code}, error: {up_res.text}")
                 except Exception as e:
                     print(f"   ⚠️ Upload failed: {e}")
                     
@@ -173,11 +176,15 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             try:
                 with open(slide_filename, "rb") as f:
                     file_bytes = f.read()
-                requests.post(upload_url, data=file_bytes, headers={
+                up_res = requests.post(upload_url, data=file_bytes, headers={
                     "X-Slide-No": str(slide_no),
                     "X-Timestamp": timestamp,
                     "X-Seconds": str(current_time)
                 })
+                if up_res.status_code == 200:
+                    print(f"   Upload first slide #{slide_no} status: {up_res.status_code}")
+                else:
+                    print(f"   ❌ Upload first slide #{slide_no} status: {up_res.status_code}, error: {up_res.text}")
             except Exception as e:
                 print(f"   ⚠️ Upload first slide failed: {e}")
                 
@@ -213,10 +220,13 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
             # 上傳 PDF
             doc_url = f"{cloudflare_url.rstrip('/')}/api/tasks/{task_id}/document"
             with open(pdf_path, "rb") as f:
-                requests.post(doc_url, data=f.read(), headers={
+                pdf_res = requests.post(doc_url, data=f.read(), headers={
                     "X-Doc-Type": "pdf"
                 })
-            print("   PDF uploaded to Cloudflare R2.")
+            if pdf_res.status_code == 200:
+                print("   PDF uploaded to Cloudflare R2.")
+            else:
+                print(f"   ❌ PDF upload failed with status {pdf_res.status_code}: {pdf_res.text}")
     except Exception as e:
         print(f"❌ Failed to compile/upload PDF: {e}")
 
@@ -239,10 +249,13 @@ def analyze_and_upload(video_url, task_id, cloudflare_url, threshold=8.0, interv
         
         # 上傳 PPTX
         with open(pptx_path, "rb") as f:
-            requests.post(doc_url, data=f.read(), headers={
+            pptx_res = requests.post(doc_url, data=f.read(), headers={
                 "X-Doc-Type": "pptx"
             })
-        print("   PPTX uploaded to Cloudflare R2.")
+        if pptx_res.status_code == 200:
+            print("   PPTX uploaded to Cloudflare R2.")
+        else:
+            print(f"   ❌ PPTX upload failed with status {pptx_res.status_code}: {pptx_res.text}")
     except Exception as e:
         print(f"❌ Failed to compile/upload PPTX: {e}")
 
